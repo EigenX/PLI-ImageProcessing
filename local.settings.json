@@ -1,0 +1,8 @@
+{
+    "IsEncrypted": false,
+    "Values": {
+        "AzureWebJobsStorage": "AzureWebJobsStorageConnectionStringValue",
+        "FUNCTIONS_WORKER_RUNTIME": "dotnet",
+        "SQLServerConnection": "Server=ex-db01-pli.database.windows.net;Initial Catalog=EX_PLI_App;Persist Security Info=False;User ID=EX_Admin;Password=Di8fsJEvmkNs8sjetBsK;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;"
+    }
+}
