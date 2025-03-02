@@ -9,19 +9,21 @@ using Azure.Storage.Blobs.Models;
 using Dapper;
 using ImageMagick;
 using ImageMagick.Drawing;
+using System.Timers;
+
 
 namespace ImageOverlayFunctionApp
 {
     internal class ImageOverlayService
     {
-        private static readonly string blobConnectionString = "DefaultEndpointsProtocol=https;AccountName=exblobpli1;EndpointSuffix=core.windows.net";
+        private static readonly string blobConnectionString = Environment.GetEnvironmentVariable("BlobConnection");
         private static readonly string containerName = "outputimages";
+
 
         public static async Task ApplyOverlayToAllProgramsAsync()
         {
             string connectionString = Environment.GetEnvironmentVariable("SQLServerConnection");
-            string query = @"SELECT item_pk, item_long_description, item_class_description, start_date, location_description FROM dbo.mktg_item_for_image";
-
+            string query = @"select m2.item_pk as ItemPk, m2.item_long_description as ItemLongDescription, m2.start_date as StartDate, m1.location_description as LocationDescription, m2.item_class_description as ItemClassDescription, count(m1.source_item_pk) over(partition by m1.source_item_pk) as SrcItemPkCount, m2.source_item_pk as SourceItemPk from [dbo].[mktg_item_for_image] m1 right join [dbo].[mktg_item_for_image] m2 on m1.item_pk = m2.source_item_pk";
             try
             {
                 // Using Dapper for database access
@@ -42,11 +44,12 @@ namespace ImageOverlayFunctionApp
         {
             try
             {
+
                 var outputFolder = @"C:\Users\SaiBussa\Pictures\output_images";
                 Directory.CreateDirectory(outputFolder);
 
                 // Define the image URL with the specified product ID
-                string url = $"https://cms.pli.edu/api/client/product/{overlay.item_pk}/image";
+                string url = Environment.GetEnvironmentVariable("ImageUrl") + $"{overlay.ItemPk}/image";
 
                 using HttpClient client = new();
                 using Stream imageStream = await client.GetStreamAsync(url);
@@ -65,13 +68,15 @@ namespace ImageOverlayFunctionApp
                 // Specify the exact format of the date string
                 string format = "MM/dd/yyyy HH:mm:ss";
                 DateTime parsedDate;
-                parsedDate = DateTime.ParseExact(overlay.start_date, format, CultureInfo.InvariantCulture);
+                parsedDate = DateTime.ParseExact(overlay.StartDate, format, CultureInfo.InvariantCulture);
                 string month = parsedDate.ToString("MMM");
                 string day = parsedDate.Day.ToString();
 
-                string programTitle = overlay.item_long_description;
-                string Location = overlay.location_description;
-                string item_class = overlay.item_class_description;
+                string programTitle = overlay.ItemLongDescription;
+                string Location = overlay.LocationDescription;
+                string item_class = overlay.ItemClassDescription;
+                string source_item_pk = overlay.SourceItemPk;
+                int src_item_pk_count = overlay.SrcItemPkCount;
 
                 // Clean the string by trimming leading/trailing spaces and replacing multiple spaces
                 programTitle = programTitle.Trim();
@@ -135,21 +140,12 @@ namespace ImageOverlayFunctionApp
                         line2 = SplitText(remainingText, maxLength, out remainingText);
                         Console.WriteLine($"Line 2 after split: {line2}");
 
-                        if (string.IsNullOrEmpty(remainingText))
-                        {
-                            line3 = "";
-                        }
+                        if (string.IsNullOrEmpty(remainingText)) { line3 = ""; }
                         else
                         {
                             // Handle third line, check for remaining text
-                            if (remainingText.Length > maxLength)
-                            {
-                                line3 = remainingText.Substring(0, maxLength).Trim() + "...";
-                            }
-                            else
-                            {
-                                line3 = remainingText.Trim();
-                            }
+                            if (remainingText.Length > maxLength) { line3 = remainingText.Substring(0, maxLength).Trim() + "..."; }
+                            else { line3 = remainingText.Trim(); }
                         }
                     }
                 }
@@ -172,40 +168,25 @@ namespace ImageOverlayFunctionApp
                 var drawables = new Drawables()
                     .StrokeWidth(2)
                     .FillColor(MagickColors.White)
-                    .RoundRectangle(20, 195, 110, 217, radius, radius).FillColor(MagickColors.Black)    
+                    .RoundRectangle(20, 195, 110, 217, radius, radius).FillColor(MagickColors.Black)
                     .RoundRectangle(xPosition + 20, 35, xPosition + 75, 90, radius, radius);
 
                 // Using Dapper for database access
-                string programIdRet = overlay.item_pk;
+                string programIdRet = overlay.ItemPk;
                 string locationstr = "";
 
-                Console.WriteLine("Item Class Desc: " + "item_class_description" + " Location " + "Location");
-                if (item_class == "Live Seminar")
+                if (src_item_pk_count == 2)
                 {
-                    locationstr = Location.ToString();
-                }
-                else if (item_class == "Live Webcast")
-                {
-                    if (String.IsNullOrEmpty(Location) == false)
-                    {
-                        locationstr = Location;
-                        locationstr = locationstr + "& Online";
-                    }
-                    else
-                    {
-                        locationstr = "Online";
-                    }
-                }
-                else if (item_class == "Live Webcast Briefing")
-                {
-                    locationstr = "Online";
+                    locationstr = Location.ToString() + " & Online";
                 }
                 else
                 {
-                    locationstr = "Online";
+                    if (String.IsNullOrEmpty(Location) == false)
+                    { locationstr = Location.ToString(); }
+                    else { locationstr = "Online"; }
                 }
 
-               
+
                 if (String.IsNullOrEmpty(locationstr) == false)
                 {
                     drawables
@@ -256,14 +237,16 @@ namespace ImageOverlayFunctionApp
                 drawables
                    .Font("Helvetica Neue-Bold")                // Set font 
                    .FillColor(MagickColors.Black)// Set font
-                   .FontPointSize(12)
+                                                 //.StrokeColor(MagickColors.Black)
+                                                 //.StrokeWidth(0.01)
+                   .FontPointSize(12.65)
                    .Text(42, 210, "Register");
 
                 // Draw text on the image
                 drawables.Draw(image);
 
                 // Define output path and save the modified image
-                string outputImagePath = Path.Combine(outputFolder, $"output_{overlay.item_pk}.jpg");
+                string outputImagePath = Path.Combine(outputFolder, $"output_{overlay.ItemPk}.jpg");
                 image.Write(outputImagePath);
 
                 if (uploadToAz)
@@ -274,14 +257,14 @@ namespace ImageOverlayFunctionApp
                     memoryStream.Position = 0;
 
                     // Upload the image to Azure Blob Storage
-                    await UploadImageToBlobStorage(memoryStream, $"output_{overlay.item_pk}.jpg");
+                    await UploadImageToBlobStorage(memoryStream, $"output_{overlay.ItemPk}.jpg");
                 }
 
                 Console.WriteLine($"Image saved");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error processing image {overlay.item_long_description}: {ex.Message}");
+                Console.WriteLine($"Error processing image {overlay.ItemLongDescription}: {ex.Message}");
             }
         }
 
@@ -319,4 +302,4 @@ namespace ImageOverlayFunctionApp
         }
     }
 }
-        
+
