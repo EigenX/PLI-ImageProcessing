@@ -5,12 +5,12 @@ namespace ImageOverlayFunctionApp
 {
     public class ImageOverlay
     {
-        public string ProgramId { get; set; }
-        public string ProgramTitle { get; set; }
-        public string ProgramDate { get; set; }
-        public string Location { get; set; }
-        public string item_class_description {  get; set; }
-        public string source_item_pk { get; set; }
-
+        public string ItemPk { get; set; }
+        public string ItemLongDescription { get; set; }
+        public string StartDate { get; set; }
+        public string LocationDescription { get; set; }
+        public string ItemClassDescription { get; set; }
+        public string SourceItemPk { get; set; }
+        public int SrcItemPkCount { get; set; }
     }
 }

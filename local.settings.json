@@ -2,6 +2,9 @@
     "IsEncrypted": false,
     "Values": {
         "AzureWebJobsStorage": "AzureWebJobsStorageConnectionStringValue",
-        "FUNCTIONS_WORKER_RUNTIME": "dotnet"
+        "FUNCTIONS_WORKER_RUNTIME": "dotnet",
+        "SQLServerConnection": "Server=ex-db01-pli.database.windows.net;Initial Catalog=EX_PLI_App;Persist Security Info=False;User ID=EX_Admin;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;",
+        "BlobConnection": "DefaultEndpointsProtocol=https;AccountName=exblobpli1;EndpointSuffix=core.windows.net",
+        "ImageUrl": "https://cms.pli.edu/api/client/product/"
     }
 }
